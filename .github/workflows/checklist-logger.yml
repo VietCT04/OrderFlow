@@ -1,0 +1,76 @@
+name: Checklist logger
+
+on:
+  issues:
+    types: [edited]
+
+permissions:
+  issues: write
+
+jobs:
+  log-checked-tasks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Detect newly checked tasks and comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue = context.payload.issue;
+            const changes = context.payload.changes || {};
+
+            // Only continue if the issue body changed
+            if (!changes.body || !changes.body.from) {
+              core.info("Issue body did not change; nothing to do.");
+              return;
+            }
+
+            const previousBody = changes.body.from || "";
+            const currentBody = issue.body || "";
+
+            const prevLines = previousBody.split(/\r?\n/);
+            const currLines = currentBody.split(/\r?\n/);
+
+            function escapeRegExp(str) {
+              return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            }
+
+            const newlyCompleted = [];
+
+            for (const line of currLines) {
+              // Match "- [x] Task text"
+              const m = line.match(/^- \[(x|X)\] (.+)$/);
+              if (!m) continue;
+
+              const taskText = m[2].trim();
+              const uncheckedLine = `- [ ] ${taskText}`;
+
+              // Was it previously unchecked (and not already checked)?
+              const wasUnchecked = prevLines.includes(uncheckedLine);
+              const checkedRegex = new RegExp(`^- \\[(x|X)\\] ${escapeRegExp(taskText)}$`);
+              const wasChecked = prevLines.some(l => checkedRegex.test(l));
+
+              if (wasUnchecked && !wasChecked) {
+                newlyCompleted.push(taskText);
+              }
+            }
+
+            if (newlyCompleted.length === 0) {
+              core.info("No newly completed tasks found.");
+              return;
+            }
+
+            const list = newlyCompleted.map(t => `- ${t}`).join('\n');
+            const now = new Date().toISOString();
+
+            const commentBody = `✅ Task(s) completed at ${now}:\n${list}`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: commentBody,
+            });
+
+            core.info("Comment posted:\n" + commentBody);

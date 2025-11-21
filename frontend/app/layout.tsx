@@ -24,9 +24,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body>
+        <header
+          className="w-full bg-slate-900 text-white shadow-sm sticky top-0 z-50 p-4 font-bold text-lg mx-auto 
+        flex items-center justify-center"
+        >
+          <div>OrderFlow</div>
+        </header>
         {children}
       </body>
     </html>

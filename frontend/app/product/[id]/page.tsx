@@ -1,22 +1,18 @@
 import type { ProductDetail } from "@/lib/catalog/types";
 
-interface ProductDetailPageProps {
-  params: { id: string };
-}
-
-// temporary mock product; later fetch by params.id from API
 const MOCK_PRODUCT: ProductDetail = {
-  id: "1",
-  name: "Sample Product 1",
-  description: "Long description of the product goes here.",
-  price: 19.99,
-  stock: 10,
+  id: "8b1a9953-c461-4f87-9e4f-000000000001",
+  name: "Wireless Noise-Cancelling Headphones",
+  description:
+    "High-fidelity wireless headphones with active noise cancellation and 30 hours of battery life.",
+  price: 199.9,
+  stock: 42,
   imagePath: undefined,
   category: {
-    id: "c1",
-    name: "Sample Category",
-    slug: "sample-category",
-    description: "Category description",
+    id: "11111111-1111-1111-1111-111111111111",
+    name: "Electronics",
+    slug: "electronics",
+    description: "Devices, gadgets, and accessories.",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -24,52 +20,88 @@ const MOCK_PRODUCT: ProductDetail = {
   updatedAt: new Date().toISOString(),
 };
 
+interface ProductDetailPageProps {
+  params: { id: string };
+}
+
 export default function ProductDetailPage({ params }: ProductDetailPageProps) {
-  const product = MOCK_PRODUCT; // ignore params.id for wireframe
+  const { id } = params;
+
+  const product = MOCK_PRODUCT;
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-8">
-      {/* breadcrumb / small header */}
-      <p className="mb-4 text-xs text-slate-500">
-        Catalog &gt; {product.category.name} &gt; {product.name}
-      </p>
+      {/* Breadcrumb */}
+      <nav className="mb-4 text-xs text-slate-500">
+        Catalog
+        <span className="mx-1">›</span>
+        {product.category.name}
+        <span className="mx-1">›</span>
+        <span className="font-medium text-slate-700">{product.name}</span>
+      </nav>
 
+      {/* Main content */}
       <section className="grid gap-8 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.4fr)]">
-        {/* image side */}
-        <div className="flex flex-col gap-4">
-          <div className="flex aspect-[4/3] items-center justify-center rounded-xl border border-slate-200 bg-slate-100">
-            {/* placeholder; later: real <img /> */}
-            <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
-              Product image
-            </span>
-          </div>
+        {/* Image side */}
+        <div className="rounded-xl border border-slate-200 bg-slate-50">
+          <div className="aspect-[4/3]" aria-hidden="true" />
         </div>
 
-        {/* info side */}
+        {/* Info side */}
         <div className="flex flex-col gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-900">
+          <header>
+            <span className="text-xs font-medium uppercase tracking-wide text-emerald-600">
+              {product.category.name}
+            </span>
+            <h1 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
               {product.name}
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              {product.category.name}
-            </p>
+          </header>
+
+          <p className="text-sm text-slate-600">{product.description}</p>
+
+          <div className="flex items-baseline gap-2">
+            <span className="text-lg font-semibold text-emerald-600">
+              ${product.price.toFixed(2)}
+            </span>
+            <span className="text-xs text-slate-500">
+              In stock: {product.stock}
+            </span>
           </div>
 
-          <p className="text-xl font-semibold text-emerald-600">
-            ${product.price.toFixed(2)}
-          </p>
+          <div className="mt-4 flex gap-2">
+            <button
+              type="button"
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-emerald-700"
+            >
+              Add to cart
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-medium text-slate-700"
+            >
+              Back to catalog
+            </button>
+          </div>
 
-          <p className="text-sm text-slate-600">
-            In stock:{" "}
-            <span className="font-medium text-slate-900">{product.stock}</span>
-          </p>
-
-          {product.description && (
-            <p className="text-sm leading-relaxed text-slate-700">
-              {product.description}
-            </p>
-          )}
+          <dl className="mt-6 grid gap-2 text-xs text-slate-500 sm:grid-cols-2">
+            <div>
+              <dt className="font-medium text-slate-600">Product ID</dt>
+              <dd className="break-all">{product.id}</dd>
+            </div>
+            <div>
+              <dt className="font-medium text-slate-600">Category slug</dt>
+              <dd>{product.category.slug}</dd>
+            </div>
+            <div>
+              <dt className="font-medium text-slate-600">Created at</dt>
+              <dd>{new Date(product.createdAt).toLocaleString()}</dd>
+            </div>
+            <div>
+              <dt className="font-medium text-slate-600">Last updated</dt>
+              <dd>{new Date(product.updatedAt).toLocaleString()}</dd>
+            </div>
+          </dl>
         </div>
       </section>
     </main>

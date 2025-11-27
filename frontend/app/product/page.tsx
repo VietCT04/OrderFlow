@@ -1,5 +1,5 @@
-import { ProductCard } from "../components/catalog/ProductCard";
-import type { ProductSummary } from "../lib/catalog/types";
+import { ProductCard } from "@/components/catalog/ProductCard";
+import type { ProductSummary } from "@/lib/catalog/types";
 
 const MOCK_PRODUCTS: ProductSummary[] = [
   {

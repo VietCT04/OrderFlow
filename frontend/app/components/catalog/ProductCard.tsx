@@ -1,4 +1,4 @@
-import type { ProductSummary } from "../../lib/catalog/types";
+import type { ProductSummary } from "@/lib/catalog/types";
 
 interface ProductCardProps {
   product: ProductSummary;

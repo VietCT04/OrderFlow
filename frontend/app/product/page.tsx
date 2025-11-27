@@ -3,56 +3,73 @@ import type { ProductSummary } from "@/lib/catalog/types";
 
 const MOCK_PRODUCTS: ProductSummary[] = [
   {
-    id: "1",
-    name: "Sample Product 1",
-    price: 19.99,
+    id: "8b1a9953-c461-4f87-9e4f-000000000001",
+    name: "Wireless Noise-Cancelling Headphones",
+    price: 199.9,
     imagePath: undefined,
-    categoryName: "Sample Category",
+    categoryName: "Electronics",
   },
   {
-    id: "2",
-    name: "Sample Product 2",
-    price: 29.99,
+    id: "8b1a9953-c461-4f87-9e4f-000000000002",
+    name: "Ergonomic Office Chair",
+    price: 329.0,
     imagePath: undefined,
-    categoryName: "Sample Category",
+    categoryName: "Furniture",
+  },
+  {
+    id: "8b1a9953-c461-4f87-9e4f-000000000003",
+    name: "Mechanical Keyboard (75%)",
+    price: 129.5,
+    imagePath: undefined,
+    categoryName: "Accessories",
   },
 ];
+
+const CURRENT_PAGE = 1;
+const TOTAL_PAGES = 5;
 
 export default function ProductListPage() {
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-8">
-      {/* header */}
-      <header className="flex items-baseline justify-between">
-        <h1 className="text-2xl font-semibold text-slate-900">Products</h1>
-        <p className="text-xs text-slate-500">Wireframe · mock data · page 1</p>
+      <header className="flex flex-col gap-2">
+        <h1 className="text-xl font-semibold tracking-tight text-slate-900">
+          Catalog
+        </h1>
+        <p className="text-sm text-slate-500">
+          Browse our products. Pagination and filters will use real data in the
+          next phase.
+        </p>
       </header>
 
-      {/* grid of cards */}
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {MOCK_PRODUCTS.map((p) => (
-          <ProductCard key={p.id} product={p} />
-        ))}
+      <section aria-label="Product grid">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {MOCK_PRODUCTS.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
       </section>
 
-      {/* pagination controls at bottom */}
-      <nav className="mt-4 flex items-center justify-center gap-3">
+      <section
+        aria-label="Pagination"
+        className="mt-4 flex items-center justify-center gap-3"
+      >
         <button
           type="button"
           disabled
-          className="rounded-full border border-slate-300 px-3 py-1 text-sm text-slate-600 shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Previous
         </button>
-
-        <span className="text-sm text-slate-500">Page 1</span>
-
+        <span className="text-xs text-slate-500">
+          Page {CURRENT_PAGE} of {TOTAL_PAGES}
+        </span>
         <button
           type="button"
-          className="rounded-full border border-slate-300 bg-slate-900 px-3 py-1 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
+          className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600"
         >
           Next
         </button>
-      </nav>
+      </section>
     </main>
   );
 }

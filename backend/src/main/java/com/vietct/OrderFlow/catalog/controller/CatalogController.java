@@ -5,12 +5,11 @@ import java.util.UUID;
 import com.vietct.OrderFlow.catalog.domain.Product;
 import com.vietct.OrderFlow.catalog.dto.ProductResponseDTO;
 import com.vietct.OrderFlow.catalog.service.CatalogService;
-
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -25,6 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/products")
 @Validated
 public class CatalogController {
+
+    private static final Logger log = LoggerFactory.getLogger(CatalogController.class);
 
     private final CatalogService catalogService;
 
@@ -46,23 +47,26 @@ public class CatalogController {
             @RequestParam(name = "categoryId", required = false)
             UUID categoryId
     ) {
+        log.info("GET /products page={} size={} sort={} categoryId={}",
+                page, size, sort, categoryId);
+
         Sort sortSpec = parseSort(sort);
         Pageable pageable = PageRequest.of(page, size, sortSpec);
 
         Page<Product> productPage = catalogService.getProducts(categoryId, pageable);
 
-        // map Page<Product> -> Page<ProductResponseDTO>
         return productPage.map(ProductResponseDTO::fromDomain);
     }
 
     @GetMapping("/{id}")
     public ProductResponseDTO getProductById(@PathVariable("id") UUID id) {
+        log.info("GET /products/{}", id);
+
         Product product = catalogService.getProductById(id);
         return ProductResponseDTO.fromDomain(product);
     }
 
     private Sort parseSort(String sortParam) {
-        // expected format: "field,DESC" or "field,ASC"
         String[] parts = sortParam.split(",");
         String property = parts[0].trim();
         if (parts.length < 2) {

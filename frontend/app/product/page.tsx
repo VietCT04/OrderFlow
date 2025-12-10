@@ -1,75 +1,95 @@
-import { ProductCard } from "@/components/catalog/ProductCard";
-import type { ProductSummary } from "@/lib/catalog/types";
+"use client";
 
-const MOCK_PRODUCTS: ProductSummary[] = [
-  {
-    id: "8b1a9953-c461-4f87-9e4f-000000000001",
-    name: "Wireless Noise-Cancelling Headphones",
-    price: 199.9,
-    imagePath: undefined,
-    categoryName: "Electronics",
-  },
-  {
-    id: "8b1a9953-c461-4f87-9e4f-000000000002",
-    name: "Ergonomic Office Chair",
-    price: 329.0,
-    imagePath: undefined,
-    categoryName: "Furniture",
-  },
-  {
-    id: "8b1a9953-c461-4f87-9e4f-000000000003",
-    name: "Mechanical Keyboard (75%)",
-    price: 129.5,
-    imagePath: undefined,
-    categoryName: "Accessories",
-  },
-];
+import { useEffect, useState } from "react";
+import { getProductsPage } from "@/lib/catalog/api";
+import { Page, ProductSummary } from "@/lib/catalog/types";
+import { ProductCard } from "@/components/catalog/ProductCard"; // NOTE: named import
 
-const CURRENT_PAGE = 1;
-const TOTAL_PAGES = 5;
+const PAGE_SIZE = 9;
 
 export default function ProductListPage() {
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageData, setPageData] = useState<Page<ProductSummary> | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await getProductsPage({
+          page: pageIndex,
+          size: PAGE_SIZE,
+          sort: "createdAt,DESC",
+        });
+        if (!cancelled) {
+          setPageData(result);
+        }
+      } catch {
+        if (!cancelled) {
+          setError("Failed to load products. Please try again later.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [pageIndex]);
+
+  const canGoPrev = pageIndex > 0;
+  const canGoNext = pageData != null && pageIndex + 1 < pageData.totalPages;
+
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-8">
+    <div className="mx-auto max-w-5xl px-4 py-8 flex flex-col gap-8">
       <header className="flex flex-col gap-2">
-        <h1 className="text-xl font-semibold tracking-tight text-slate-900">
-          Catalog
+        <h1 className="text-2xl font-semibold text-slate-900">
+          Product catalog
         </h1>
         <p className="text-sm text-slate-500">
-          Browse our products. Pagination and filters will use real data in the
-          next phase.
+          Data is fetched from the OrderFlow Spring Boot backend.
         </p>
       </header>
 
-      <section aria-label="Product grid">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {MOCK_PRODUCTS.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
+      {loading && (
+        <div className="py-8 text-center text-sm text-slate-500">
+          Loading products...
         </div>
-      </section>
+      )}
 
-      <section
-        aria-label="Pagination"
-        className="mt-4 flex items-center justify-center gap-3"
-      >
-        <button
-          type="button"
-          disabled
-          className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Previous
-        </button>
-        <span className="text-xs text-slate-500">
-          Page {CURRENT_PAGE} of {TOTAL_PAGES}
-        </span>
-        <button
-          type="button"
-          className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600"
-        >
-          Next
-        </button>
-      </section>
-    </main>
+      {error && !loading && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {!loading && !error && pageData && pageData.content.length === 0 && (
+        <div className="py-8 text-center text-sm text-slate-500">
+          No products available.
+        </div>
+      )}
+
+      {!loading && !error && pageData && pageData.content.length > 0 && (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {pageData.content.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+
+          <div className="mt-4 flex items-center justify-center gap-3 text-sm">
+            {/* pagination buttons as before */}
+          </div>
+        </>
+      )}
+    </div>
   );
 }

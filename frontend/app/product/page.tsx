@@ -12,6 +12,7 @@ export default function ProductListPage() {
   const [pageData, setPageData] = useState<Page<ProductSummary> | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshCounter, setRefreshCounter] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,10 +44,29 @@ export default function ProductListPage() {
     return () => {
       cancelled = true;
     };
-  }, [pageIndex]);
+  }, [pageIndex, refreshCounter]);
 
   const canGoPrev = pageIndex > 0;
-  const canGoNext = pageData != null && pageIndex + 1 < pageData.totalPages;
+  const canGoNext =
+    pageData != null && pageData.totalPages > 0 && pageIndex + 1 < pageData.totalPages;
+  const totalPages = pageData?.totalPages ?? 0;
+  const totalElements = pageData?.totalElements ?? 0;
+
+  function goPrev() {
+    if (canGoPrev) {
+      setPageIndex((prev) => prev - 1);
+    }
+  }
+
+  function goNext() {
+    if (canGoNext) {
+      setPageIndex((prev) => prev + 1);
+    }
+  }
+
+  function retryLoading() {
+    setRefreshCounter((prev) => prev + 1);
+  }
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 flex flex-col gap-8">
@@ -66,8 +86,15 @@ export default function ProductListPage() {
       )}
 
       {error && !loading && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+        <div className="flex flex-col gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={retryLoading}
+            className="inline-flex w-fit items-center justify-center rounded-md border border-red-200 bg-white px-3 py-1 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+          >
+            Try again
+          </button>
         </div>
       )}
 
@@ -85,8 +112,31 @@ export default function ProductListPage() {
             ))}
           </div>
 
-          <div className="mt-4 flex items-center justify-center gap-3 text-sm">
-            {/* pagination buttons as before */}
+          <div className="mt-4 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={goPrev}
+                disabled={!canGoPrev}
+                className="rounded-full border border-slate-200 px-4 py-1 text-xs font-medium transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Previous
+              </button>
+
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={!canGoNext}
+                className="rounded-full border border-slate-200 px-4 py-1 text-xs font-medium transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Next
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-500">
+              Page {Math.min(pageIndex + 1, Math.max(totalPages, 1))} of{" "}
+              {Math.max(totalPages, 1)} · {totalElements} products
+            </div>
           </div>
         </>
       )}

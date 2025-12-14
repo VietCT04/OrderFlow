@@ -24,11 +24,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>
-        <header
-          className="w-full bg-slate-900 text-white shadow-sm sticky top-0 z-50 p-4 font-bold text-lg mx-auto 
-        flex items-center justify-center"
-        >
+      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+        <header className="sticky top-0 z-50 flex w-full items-center justify-center bg-slate-900 p-4 text-lg font-bold text-white shadow-sm">
           <div>OrderFlow</div>
         </header>
         {children}

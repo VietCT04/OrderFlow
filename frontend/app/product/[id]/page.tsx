@@ -1,6 +1,9 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { getProductDetail } from "@/lib/catalog/api";
 import { ProductDetail } from "@/lib/catalog/types";
@@ -13,6 +16,7 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshCounter, setRefreshCounter] = useState(0);
 
   useEffect(() => {
     if (!id) return;
@@ -22,6 +26,7 @@ export default function ProductDetailPage() {
       setLoading(true);
       setError(null);
       setNotFound(false);
+
       try {
         const result = await getProductDetail(id);
         if (cancelled) return;
@@ -47,19 +52,29 @@ export default function ProductDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, refreshCounter]);
+
+  function retryLoading() {
+    setRefreshCounter((prev) => prev + 1);
+  }
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
-      <div className="mb-4 text-xs text-slate-500">
-        <span>Catalog</span>
+      <div className="mb-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+        <Link
+          href="/product"
+          className="inline-flex items-center gap-1 text-slate-600 underline-offset-4 hover:underline"
+        >
+          {"<-"} Back to catalog
+        </Link>
         {product && (
-          <>
-            <span className="mx-1">›</span>
+          <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-slate-400">
+            <span>Catalog</span>
+            <span>{">"}</span>
             <span>{product.category.name}</span>
-            <span className="mx-1">›</span>
-            <span className="font-medium text-slate-700">{product.name}</span>
-          </>
+            <span>{">"}</span>
+            <span className="font-medium text-slate-600">{product.name}</span>
+          </div>
         )}
       </div>
 
@@ -70,8 +85,15 @@ export default function ProductDetailPage() {
       )}
 
       {error && !loading && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+        <div className="flex flex-col gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={retryLoading}
+            className="inline-flex w-fit items-center justify-center rounded-md border border-red-200 bg-white px-3 py-1 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+          >
+            Try again
+          </button>
         </div>
       )}
 
@@ -83,7 +105,19 @@ export default function ProductDetailPage() {
 
       {!loading && !error && !notFound && product && (
         <div className="grid gap-8 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.4fr)]">
-          <div className="aspect-[4/3] overflow-hidden rounded-xl border border-slate-200 bg-slate-100" />
+          <div className="aspect-[4/3] overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+            {product.imagePath ? (
+              <img
+                src={product.imagePath}
+                alt={product.name}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-xs font-semibold uppercase text-slate-400">
+                No image
+              </div>
+            )}
+          </div>
 
           <div className="flex flex-col gap-4">
             <div>

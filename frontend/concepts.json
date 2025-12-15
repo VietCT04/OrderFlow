@@ -1,0 +1,15 @@
+{
+  "project": "OrderFlow Backend",
+  "highlights": [
+    "Built a clean Spring Boot backend with layered architecture separating controller, service, repository, and domain logic",
+    "Used Flyway migrations with Hibernate schema validation to prevent database drift across environments",
+    "Designed a shared BaseEntity with UUID primary keys and automatic createdAt and updatedAt auditing",
+    "Modeled Category and Product domain with proper JPA relationships, constraints, and indexes for integrity and performance",
+    "Implemented Spring Data JPA repositories with pagination, sorting, and custom query methods",
+    "Encapsulated business logic in a transactional service layer with clear domain exceptions",
+    "Standardized API responses using DTOs and a global exception handler for consistent error handling",
+    "Configured global CORS to enable safe frontend integration during development",
+    "Added environment-specific configuration for dev and test profiles",
+    "Integrated Testcontainers with PostgreSQL to run realistic, CI-safe integration tests"
+  ]
+}

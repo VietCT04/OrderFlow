@@ -1,0 +1,524 @@
+{
+  "backend": {
+    "rootDir": "backend",
+    "description": "Spring Boot OrderFlow backend (Java 21, Postgres, Flyway, Testcontainers)",
+    "source": {
+      "java": [
+        {
+          "path": "src/main/java/com/vietct/OrderFlow/OrderFlowApplication.java",
+          "type": "spring_boot_application",
+          "classes": [
+            {
+              "name": "OrderFlowApplication",
+              "role": "Application entry point",
+              "keyAnnotations": [
+                "@SpringBootApplication"
+              ],
+              "responsibilities": [
+                "Bootstrap Spring Boot application",
+                "Scan base package com.vietct.OrderFlow for components"
+              ]
+            }
+          ]
+        },
+        {
+          "path": "src/main/java/com/vietct/OrderFlow/config/JpaConfig.java",
+          "type": "spring_config",
+          "classes": [
+            {
+              "name": "JpaConfig",
+              "role": "Enable JPA auditing",
+              "keyAnnotations": [
+                "@Configuration",
+                "@EnableJpaAuditing"
+              ],
+              "responsibilities": [
+                "Turn on created_at / updated_at auditing for JPA entities"
+              ]
+            }
+          ]
+        },
+        {
+          "path": "src/main/java/com/vietct/OrderFlow/config/CorsConfig.java",
+          "type": "spring_config",
+          "classes": [
+            {
+              "name": "CorsConfig",
+              "role": "Global CORS configuration for dev",
+              "keyAnnotations": [
+                "@Configuration"
+              ],
+              "responsibilities": [
+                "Expose /api endpoints to Next.js dev origin http://localhost:3000",
+                "Allow GET/POST/PUT/PATCH/DELETE/OPTIONS and all headers"
+              ]
+            }
+          ]
+        },
+        {
+          "path": "src/main/java/com/vietct/OrderFlow/common/model/BaseEntity.java",
+          "type": "jpa_base_entity",
+          "classes": [
+            {
+              "name": "BaseEntity",
+              "role": "Abstract base entity with UUID id and audit timestamps",
+              "keyAnnotations": [
+                "@MappedSuperclass",
+                "@EntityListeners(AuditingEntityListener.class)"
+              ],
+              "fields": [
+                "UUID id",
+                "Instant createdAt",
+                "Instant updatedAt"
+              ],
+              "responsibilities": [
+                "Provide UUID primary key",
+                "Provide created_at and updated_at fields via auditing",
+                "Generate UUID on @PrePersist"
+              ]
+            }
+          ]
+        },
+        {
+          "path": "src/main/java/com/vietct/OrderFlow/catalog/domain/Category.java",
+          "type": "jpa_entity",
+          "classes": [
+            {
+              "name": "Category",
+              "extends": "BaseEntity",
+              "role": "Catalog category entity",
+              "keyAnnotations": [
+                "@Entity",
+                "@Table(name = \"category\")"
+              ],
+              "fields": [
+                "String name",
+                "String slug",
+                "String description",
+                "List<Product> products (lazy)"
+              ],
+              "relationships": [
+                "OneToMany products mappedBy category"
+              ]
+            }
+          ]
+        },
+        {
+          "path": "src/main/java/com/vietct/OrderFlow/catalog/domain/Product.java",
+          "type": "jpa_entity",
+          "classes": [
+            {
+              "name": "Product",
+              "extends": "BaseEntity",
+              "role": "Catalog product entity",
+              "keyAnnotations": [
+                "@Entity",
+                "@Table(name = \"product\")"
+              ],
+              "fields": [
+                "String name",
+                "String description",
+                "BigDecimal price",
+                "Integer stock",
+                "String imagePath",
+                "Category category (lazy many-to-one)"
+              ],
+              "relationships": [
+                "ManyToOne category with fk_product_category"
+              ]
+            }
+          ]
+        },
+        {
+          "path": "src/main/java/com/vietct/OrderFlow/catalog/repository/CategoryRepository.java",
+          "type": "spring_data_repository",
+          "interfaces": [
+            {
+              "name": "CategoryRepository",
+              "extends": "JpaRepository<Category, UUID>",
+              "role": "Category persistence port",
+              "customMethods": [
+                "Optional<Category> findBySlug(String slug)",
+                "boolean existsBySlug(String slug)"
+              ]
+            }
+          ]
+        },
+        {
+          "path": "src/main/java/com/vietct/OrderFlow/catalog/repository/ProductRepository.java",
+          "type": "spring_data_repository",
+          "interfaces": [
+            {
+              "name": "ProductRepository",
+              "extends": "JpaRepository<Product, UUID>",
+              "role": "Product persistence port",
+              "customMethods": [
+                "Page<Product> findByCategoryId(UUID categoryId, Pageable pageable)"
+              ]
+            }
+          ]
+        },
+        {
+          "path": "src/main/java/com/vietct/OrderFlow/catalog/exception/ProductNotFoundException.java",
+          "type": "domain_exception",
+          "classes": [
+            {
+              "name": "ProductNotFoundException",
+              "role": "Thrown when product id is not found",
+              "baseClass": "RuntimeException",
+              "constructors": [
+                "ProductNotFoundException(UUID id) -> message 'Product not found: {id}'"
+              ]
+            }
+          ]
+        },
+        {
+          "path": "src/main/java/com/vietct/OrderFlow/catalog/exception/CategoryNotFoundException.java",
+          "type": "domain_exception",
+          "classes": [
+            {
+              "name": "CategoryNotFoundException",
+              "role": "Thrown when category id is not found",
+              "baseClass": "RuntimeException"
+            }
+          ]
+        },
+        {
+          "path": "src/main/java/com/vietct/OrderFlow/catalog/service/CatalogService.java",
+          "type": "service_interface",
+          "interfaces": [
+            {
+              "name": "CatalogService",
+              "role": "Read-only catalog use cases",
+              "methods": [
+                "Product getProductById(UUID id)",
+                "Page<Product> getProducts(UUID categoryId, Pageable pageable)"
+              ]
+            }
+          ]
+        },
+        {
+          "path": "src/main/java/com/vietct/OrderFlow/catalog/service/CatalogServiceImpl.java",
+          "type": "service_impl",
+          "classes": [
+            {
+              "name": "CatalogServiceImpl",
+              "implements": [
+                "CatalogService"
+              ],
+              "role": "Catalog domain service implementation",
+              "keyAnnotations": [
+                "@Service",
+                "@Transactional(readOnly = true)"
+              ],
+              "dependencies": [
+                "ProductRepository",
+                "CategoryRepository"
+              ],
+              "responsibilities": [
+                "Load product by id or throw ProductNotFoundException",
+                "Return paginated product list",
+                "Validate category existence and throw CategoryNotFoundException when needed"
+              ]
+            }
+          ]
+        },
+        {
+          "path": "src/main/java/com/vietct/OrderFlow/catalog/dto/CategoryResponseDTO.java",
+          "type": "dto",
+          "classes": [
+            {
+              "name": "CategoryResponseDTO",
+              "role": "API response DTO for Category",
+              "fields": [
+                "UUID id",
+                "String name",
+                "String slug",
+                "String description"
+              ],
+              "factoryMethods": [
+                "static CategoryResponseDTO fromDomain(Category category)"
+              ]
+            }
+          ]
+        },
+        {
+          "path": "src/main/java/com/vietct/OrderFlow/catalog/dto/ProductResponseDTO.java",
+          "type": "dto",
+          "classes": [
+            {
+              "name": "ProductResponseDTO",
+              "role": "API response DTO for Product",
+              "fields": [
+                "UUID id",
+                "String name",
+                "String description",
+                "BigDecimal price",
+                "Integer stock",
+                "String imagePath",
+                "CategoryResponseDTO category",
+                "Instant createdAt",
+                "Instant updatedAt"
+              ],
+              "factoryMethods": [
+                "static ProductResponseDTO fromDomain(Product product)"
+              ]
+            }
+          ]
+        },
+        {
+          "path": "src/main/java/com/vietct/OrderFlow/catalog/dto/ProductCreateRequest.java",
+          "type": "dto_request",
+          "classes": [
+            {
+              "name": "ProductCreateRequest",
+              "role": "Validation-ready DTO for creating products",
+              "keyAnnotations": [
+                "jakarta.validation constraints on fields"
+              ],
+              "fields": [
+                "String name",
+                "String description",
+                "BigDecimal price",
+                "Integer stock",
+                "String imagePath",
+                "UUID categoryId"
+              ]
+            }
+          ]
+        },
+        {
+          "path": "src/main/java/com/vietct/OrderFlow/catalog/dto/ProductUpdateRequest.java",
+          "type": "dto_request",
+          "classes": [
+            {
+              "name": "ProductUpdateRequest",
+              "role": "Optional-fields DTO for updating products",
+              "keyAnnotations": [
+                "jakarta.validation constraints on fields"
+              ],
+              "fields": [
+                "String name",
+                "String description",
+                "BigDecimal price",
+                "Integer stock",
+                "String imagePath",
+                "UUID categoryId"
+              ]
+            }
+          ]
+        },
+        {
+          "path": "src/main/java/com/vietct/OrderFlow/catalog/controller/CatalogController.java",
+          "type": "rest_controller",
+          "classes": [
+            {
+              "name": "CatalogController",
+              "role": "REST controller for Catalog read APIs",
+              "keyAnnotations": [
+                "@RestController",
+                "@RequestMapping(\"/products\")",
+                "@Validated"
+              ],
+              "endpoints": [
+                "GET /products?page=&size=&sort=&categoryId= -> Page<ProductResponseDTO>",
+                "GET /products/{id} -> ProductResponseDTO"
+              ],
+              "notes": [
+                "Uses Spring Data Pageable and custom sort parsing",
+                "Logs requests for observability"
+              ]
+            }
+          ]
+        },
+        {
+          "path": "src/main/java/com/vietct/OrderFlow/common/error/ApiErrorResponse.java",
+          "type": "error_dto",
+          "classes": [
+            {
+              "name": "ApiErrorResponse",
+              "role": "Standard error response body",
+              "fields": [
+                "Instant timestamp",
+                "int status",
+                "String error",
+                "String message",
+                "String path",
+                "Map<String, String> fieldErrors"
+              ]
+            }
+          ]
+        },
+        {
+          "path": "src/main/java/com/vietct/OrderFlow/common/error/GlobalExceptionHandler.java",
+          "type": "error_handler",
+          "classes": [
+            {
+              "name": "GlobalExceptionHandler",
+              "role": "Centralized exception to HTTP mapping",
+              "keyAnnotations": [
+                "@RestControllerAdvice"
+              ],
+              "handles": [
+                "ProductNotFoundException, CategoryNotFoundException -> 404",
+                "MethodArgumentNotValidException, ConstraintViolationException -> 400",
+                "Exception (fallback) -> 500"
+              ],
+              "logging": [
+                "Info logs for 400/404 with context",
+                "Error logs with stack trace for 500"
+              ]
+            }
+          ]
+        },
+        {
+          "path": "src/main/java/com/vietct/OrderFlow/catalog/bootstrap/CatalogManualTestRunner.java",
+          "type": "command_line_runner_dev",
+          "classes": [
+            {
+              "name": "CatalogManualTestRunner",
+              "role": "Dev-only manual test runner for seeding and testing CatalogService",
+              "keyAnnotations": [
+                "@Component",
+                "@Profile(\"dev\")",
+                "@Transactional"
+              ],
+              "implements": [
+                "CommandLineRunner"
+              ],
+              "responsibilities": [
+                "Seed sample categories and products into dev database when empty",
+                "Call CatalogService.getProductById and log results",
+                "Call CatalogService.getProducts with pagination and log results"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "resources": [
+      {
+        "path": "src/main/resources/application.properties",
+        "type": "spring_config_base",
+        "purpose": "Base configuration (shared defaults) for all profiles"
+      },
+      {
+        "path": "src/main/resources/application-dev.properties",
+        "type": "spring_config_profile",
+        "profile": "dev",
+        "purpose": "Development profile configuration pointing to local Postgres dev DB",
+        "notableProperties": [
+          "spring.datasource.url=jdbc:postgresql://localhost:5432/orderflow_dev",
+          "spring.datasource.username=orderflow_user",
+          "spring.datasource.password=***",
+          "spring.jpa.hibernate.ddl-auto=validate",
+          "spring.flyway.enabled=true",
+          "spring.flyway.locations=classpath:db/migration"
+        ]
+      },
+      {
+        "path": "src/main/resources/application-test.properties",
+        "type": "spring_config_profile",
+        "profile": "test",
+        "purpose": "Test profile defaults (overridden dynamically by Testcontainers)",
+        "notableProperties": [
+          "spring.jpa.hibernate.ddl-auto=validate",
+          "spring.flyway.enabled=true",
+          "spring.flyway.locations=classpath:db/migration"
+        ]
+      },
+      {
+        "path": "src/main/resources/db/migration/V1__init_catalog_schema.sql",
+        "type": "flyway_migration_sql",
+        "version": 1,
+        "description": "Initial catalog schema: category + product",
+        "affectsTables": [
+          "category",
+          "product",
+          "flyway_schema_history"
+        ],
+        "operations": [
+          "Create table category (id UUID PK, name, slug UNIQUE, description, created_at, updated_at)",
+          "Create table product (id UUID PK, name, description, price NUMERIC, stock INT, image_path, category_id FK, created_at, updated_at)",
+          "Add CHECK constraints for non-negative price and stock",
+          "Add UNIQUE index on category.slug",
+          "Add composite index on product(category_id, price)"
+        ]
+      }
+    ],
+    "tests": [
+      {
+        "path": "src/test/java/com/vietct/OrderFlow/OrderFlowApplicationTests.java",
+        "type": "spring_boot_test",
+        "status": "disabled",
+        "annotations": [
+          "@Disabled",
+          "@Test"
+        ],
+        "purpose": "Default contextLoads test generated by Spring Initializr; now disabled in favour of Testcontainers-based integration test"
+      },
+      {
+        "path": "src/test/java/com/vietct/OrderFlow/DatabaseMigrationIntegrationTest.java",
+        "type": "integration_test",
+        "frameworks": [
+          "JUnit 5",
+          "Spring Boot Test",
+          "Testcontainers",
+          "PostgreSQLContainer"
+        ],
+        "annotations": [
+          "@Testcontainers",
+          "@SpringBootTest"
+        ],
+        "purpose": "Start Spring context against a dev-like Postgres Testcontainer, ensure Flyway runs and the product table is accessible",
+        "staticTestInfrastructure": {
+          "container": {
+            "class": "PostgreSQLContainer",
+            "image": "postgres:17-alpine",
+            "databaseName": "orderflow_test",
+            "username": "test",
+            "password": "test"
+          },
+          "dynamicProperties": [
+            "spring.datasource.url -> postgres.getJdbcUrl()",
+            "spring.datasource.username -> postgres.getUsername()",
+            "spring.datasource.password -> postgres.getPassword()",
+            "spring.jpa.hibernate.ddl-auto -> validate",
+            "spring.flyway.enabled -> true",
+            "spring.flyway.locations -> classpath:db/migration"
+          ]
+        }
+      },
+      {
+        "path": "src/test/java/com/vietct/OrderFlow/catalog/service/CatalogServiceImplTest.java",
+        "type": "unit_test",
+        "frameworks": [
+          "JUnit 5",
+          "Mockito",
+          "AssertJ"
+        ],
+        "purpose": "Unit-test CatalogServiceImpl behavior with mocked repositories"
+      },
+      {
+        "path": "src/test/java/com/vietct/OrderFlow/catalog/controller/CatalogControllerTest.java",
+        "type": "webmvc_slice_test",
+        "frameworks": [
+          "JUnit 5",
+          "Spring WebMvcTest",
+          "Mockito"
+        ],
+        "annotations": [
+          "@WebMvcTest(CatalogController.class)",
+          "@Import(GlobalExceptionHandler.class)"
+        ],
+        "purpose": "Verify JSON contract and error handling for /products and /products/{id}",
+        "scenarios": [
+          "GET /products returns paged list with metadata",
+          "GET /products/{id} returns 200 for existing product",
+          "GET /products/{id} returns 404 + ApiErrorResponse when product is missing",
+          "GET /products with invalid page parameter returns 400 validation error"
+        ]
+      }
+    ]
+  }
+}

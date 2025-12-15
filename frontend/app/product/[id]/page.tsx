@@ -1,109 +1,152 @@
-import type { ProductDetail } from "@/lib/catalog/types";
+"use client";
 
-const MOCK_PRODUCT: ProductDetail = {
-  id: "8b1a9953-c461-4f87-9e4f-000000000001",
-  name: "Wireless Noise-Cancelling Headphones",
-  description:
-    "High-fidelity wireless headphones with active noise cancellation and 30 hours of battery life.",
-  price: 199.9,
-  stock: 42,
-  imagePath: undefined,
-  category: {
-    id: "11111111-1111-1111-1111-111111111111",
-    name: "Electronics",
-    slug: "electronics",
-    description: "Devices, gadgets, and accessories.",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-};
+/* eslint-disable @next/next/no-img-element */
 
-interface ProductDetailPageProps {
-  params: { id: string };
-}
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { getProductDetail } from "@/lib/catalog/api";
+import { ProductDetail } from "@/lib/catalog/types";
 
-export default function ProductDetailPage({ params }: ProductDetailPageProps) {
-  const { id } = params;
+export default function ProductDetailPage() {
+  const params = useParams<{ id: string }>();
+  const id = params?.id;
 
-  const product = MOCK_PRODUCT;
+  const [product, setProduct] = useState<ProductDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshCounter, setRefreshCounter] = useState(0);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      setError(null);
+      setNotFound(false);
+
+      try {
+        const result = await getProductDetail(id);
+        if (cancelled) return;
+
+        if (result === null) {
+          setNotFound(true);
+          setProduct(null);
+        } else {
+          setProduct(result);
+        }
+      } catch {
+        if (!cancelled) {
+          setError("Failed to load product. Please try again later.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, refreshCounter]);
+
+  function retryLoading() {
+    setRefreshCounter((prev) => prev + 1);
+  }
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8">
-      {/* Breadcrumb */}
-      <nav className="mb-4 text-xs text-slate-500">
-        Catalog
-        <span className="mx-1">›</span>
-        {product.category.name}
-        <span className="mx-1">›</span>
-        <span className="font-medium text-slate-700">{product.name}</span>
-      </nav>
+    <div className="mx-auto max-w-4xl px-4 py-8">
+      <div className="mb-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+        <Link
+          href="/product"
+          className="inline-flex items-center gap-1 text-slate-600 underline-offset-4 hover:underline"
+        >
+          {"<-"} Back to catalog
+        </Link>
+        {product && (
+          <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-slate-400">
+            <span>Catalog</span>
+            <span>{">"}</span>
+            <span>{product.category.name}</span>
+            <span>{">"}</span>
+            <span className="font-medium text-slate-600">{product.name}</span>
+          </div>
+        )}
+      </div>
 
-      {/* Main content */}
-      <section className="grid gap-8 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.4fr)]">
-        {/* Image side */}
-        <div className="rounded-xl border border-slate-200 bg-slate-50">
-          <div className="aspect-[4/3]" aria-hidden="true" />
+      {loading && (
+        <div className="py-8 text-center text-sm text-slate-500">
+          Loading product...
         </div>
+      )}
 
-        {/* Info side */}
-        <div className="flex flex-col gap-4">
-          <header>
-            <span className="text-xs font-medium uppercase tracking-wide text-emerald-600">
-              {product.category.name}
-            </span>
-            <h1 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
-              {product.name}
-            </h1>
-          </header>
+      {error && !loading && (
+        <div className="flex flex-col gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={retryLoading}
+            className="inline-flex w-fit items-center justify-center rounded-md border border-red-200 bg-white px-3 py-1 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+          >
+            Try again
+          </button>
+        </div>
+      )}
 
-          <p className="text-sm text-slate-600">{product.description}</p>
+      {notFound && !loading && !error && (
+        <div className="py-8 text-center text-sm text-slate-500">
+          Product not found.
+        </div>
+      )}
 
-          <div className="flex items-baseline gap-2">
-            <span className="text-lg font-semibold text-emerald-600">
-              ${product.price.toFixed(2)}
-            </span>
-            <span className="text-xs text-slate-500">
-              In stock: {product.stock}
-            </span>
+      {!loading && !error && !notFound && product && (
+        <div className="grid gap-8 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.4fr)]">
+          <div className="aspect-[4/3] overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+            {product.imagePath ? (
+              <img
+                src={product.imagePath}
+                alt={product.name}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-xs font-semibold uppercase text-slate-400">
+                No image
+              </div>
+            )}
           </div>
 
-          <div className="mt-4 flex gap-2">
-            <button
-              type="button"
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-emerald-700"
-            >
-              Add to cart
-            </button>
-            <button
-              type="button"
-              className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-medium text-slate-700"
-            >
-              Back to catalog
-            </button>
-          </div>
+          <div className="flex flex-col gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold text-slate-900">
+                {product.name}
+              </h1>
+              <p className="mt-1 text-xs text-slate-500">
+                {product.category.name}
+              </p>
+            </div>
 
-          <dl className="mt-6 grid gap-2 text-xs text-slate-500 sm:grid-cols-2">
-            <div>
-              <dt className="font-medium text-slate-600">Product ID</dt>
-              <dd className="break-all">{product.id}</dd>
+            <div className="text-xl font-semibold text-emerald-600">
+              {product.price.toLocaleString("en-US", {
+                style: "currency",
+                currency: "USD",
+              })}
             </div>
-            <div>
-              <dt className="font-medium text-slate-600">Category slug</dt>
-              <dd>{product.category.slug}</dd>
+
+            <div className="text-sm text-slate-600">
+              {product.description ||
+                "This product does not have a description yet."}
             </div>
-            <div>
-              <dt className="font-medium text-slate-600">Created at</dt>
-              <dd>{new Date(product.createdAt).toLocaleString()}</dd>
+
+            <div className="text-xs text-slate-500">
+              In stock: <span className="font-medium">{product.stock}</span>
             </div>
-            <div>
-              <dt className="font-medium text-slate-600">Last updated</dt>
-              <dd>{new Date(product.updatedAt).toLocaleString()}</dd>
-            </div>
-          </dl>
+          </div>
         </div>
-      </section>
-    </main>
+      )}
+    </div>
   );
 }

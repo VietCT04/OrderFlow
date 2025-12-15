@@ -75,7 +75,8 @@ export default function ProductListPage() {
           Product catalog
         </h1>
         <p className="text-sm text-slate-500">
-          Data is fetched from the OrderFlow Spring Boot backend.
+          Data is fetched from the OrderFlow Spring Boot backend. Open a product
+          to see live stock plus the new checkout panel.
         </p>
       </header>
 
@@ -135,7 +136,7 @@ export default function ProductListPage() {
 
             <div className="text-xs text-slate-500">
               Page {Math.min(pageIndex + 1, Math.max(totalPages, 1))} of{" "}
-              {Math.max(totalPages, 1)} · {totalElements} products
+              {Math.max(totalPages, 1)} | {totalElements} products
             </div>
           </div>
         </>

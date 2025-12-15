@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { getProductDetail } from "@/lib/catalog/api";
 import { ProductDetail } from "@/lib/catalog/types";
+import { ProductPurchasePanel } from "@/components/order/ProductPurchasePanel";
 
 export default function ProductDetailPage() {
   const params = useParams<{ id: string }>();
@@ -104,47 +105,80 @@ export default function ProductDetailPage() {
       )}
 
       {!loading && !error && !notFound && product && (
-        <div className="grid gap-8 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.4fr)]">
-          <div className="aspect-[4/3] overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
-            {product.imagePath ? (
-              <img
-                src={product.imagePath}
-                alt={product.name}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center text-xs font-semibold uppercase text-slate-400">
-                No image
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+          <div className="space-y-6">
+            <div className="grid gap-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+              <div className="aspect-[4/3] overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+                {product.imagePath ? (
+                  <img
+                    src={product.imagePath}
+                    alt={product.name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-xs font-semibold uppercase text-slate-400">
+                    No image
+                  </div>
+                )}
               </div>
-            )}
+
+              <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
+                    Product
+                  </p>
+                  <h1 className="text-2xl font-semibold text-slate-900">
+                    {product.name}
+                  </h1>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {product.category.name}
+                  </p>
+                </div>
+
+                <div className="text-xl font-semibold text-emerald-600">
+                  {product.price.toLocaleString("en-US", {
+                    style: "currency",
+                    currency: "USD",
+                  })}
+                </div>
+
+                <div className="text-sm text-slate-600">
+                  {product.description ||
+                    "This product does not have a description yet."}
+                </div>
+
+                <div className="text-xs text-slate-500">
+                  In stock: <span className="font-semibold">{product.stock}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-2">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
+                  Created
+                </p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {new Date(product.createdAt).toLocaleString()}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
+                  Updated
+                </p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {new Date(product.updatedAt).toLocaleString()}
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="flex flex-col gap-4">
-            <div>
-              <h1 className="text-2xl font-semibold text-slate-900">
-                {product.name}
-              </h1>
-              <p className="mt-1 text-xs text-slate-500">
-                {product.category.name}
-              </p>
-            </div>
-
-            <div className="text-xl font-semibold text-emerald-600">
-              {product.price.toLocaleString("en-US", {
-                style: "currency",
-                currency: "USD",
-              })}
-            </div>
-
-            <div className="text-sm text-slate-600">
-              {product.description ||
-                "This product does not have a description yet."}
-            </div>
-
-            <div className="text-xs text-slate-500">
-              In stock: <span className="font-medium">{product.stock}</span>
-            </div>
-          </div>
+          <ProductPurchasePanel
+            productId={product.id}
+            productName={product.name}
+            price={product.price}
+            stock={product.stock}
+          />
         </div>
       )}
     </div>

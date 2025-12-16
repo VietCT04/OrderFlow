@@ -15,8 +15,10 @@ import com.vietct.OrderFlow.order.dto.OrderItemRequest;
 import com.vietct.OrderFlow.order.exception.OrderNotFoundException;
 import com.vietct.OrderFlow.order.repository.OrderRepository;
 import com.vietct.OrderFlow.payment.service.PaymentService;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -40,7 +42,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public Order placeOrder(OrderCreateRequest request) {
         Order order = new Order();
         order.setUserId(request.userId());

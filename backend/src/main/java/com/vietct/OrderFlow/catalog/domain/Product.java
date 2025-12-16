@@ -34,7 +34,7 @@ public class Product extends BaseEntity {
     )
     private Category category;
 
-    protected Product() {
+    public Product() {
         // JPA
     }
 
@@ -53,7 +53,6 @@ public class Product extends BaseEntity {
         this.imagePath = imagePath;
         this.category = category;
     }
-
 
     public String getName() {
         return name;
@@ -79,25 +78,27 @@ public class Product extends BaseEntity {
         return category;
     }
 
-    // domain behavior
-
-    public void changePrice(BigDecimal newPrice) {
-        this.price = newPrice;
+    public void setName(String name) {
+        this.name = name;
     }
 
-    public void changeStock(int newStock) {
-        this.stock = newStock;
+    public void setDescription(String description) {
+        this.description = description;
     }
 
-    public void changeCategory(Category newCategory) {
-        this.category = newCategory;
+    public void setPrice(BigDecimal price) {
+        this.price = price;
     }
 
-    public void changeDescription(String newDescription) {
-        this.description = newDescription;
+    public void setStock(Integer stock) {
+        this.stock = stock;
     }
 
-    public void changeImagePath(String newImagePath) {
-        this.imagePath = newImagePath;
+    public void setImagePath(String imagePath) {
+        this.imagePath = imagePath;
+    }
+
+    public void setCategory(Category category) {
+        this.category = category;
     }
 }

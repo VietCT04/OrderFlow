@@ -6,7 +6,7 @@ import com.vietct.OrderFlow.order.repository.OrderRepository;
 import com.vietct.OrderFlow.payment.domain.Payment;
 import com.vietct.OrderFlow.payment.domain.PaymentStatus;
 import com.vietct.OrderFlow.payment.repository.PaymentRepository;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;

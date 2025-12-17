@@ -9,6 +9,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.vietct.OrderFlow.catalog.dto.ProductSearchCriteria;
+import com.vietct.OrderFlow.catalog.repository.ProductSpecifications;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.util.UUID;
 
@@ -29,6 +32,12 @@ public class CatalogServiceImpl implements CatalogService {
     public Product getProductById(UUID id) {
         return productRepository.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException(id));
+    }
+
+    @Override
+    public Page<Product> searchProducts(ProductSearchCriteria criteria, Pageable pageable) {
+        Specification<Product> spec = ProductSpecifications.build(criteria);
+        return productRepository.findAll(spec, pageable);
     }
 
     @Override

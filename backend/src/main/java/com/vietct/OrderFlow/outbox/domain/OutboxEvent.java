@@ -21,7 +21,7 @@ public class OutboxEvent extends BaseEntity {
     @Column(name = "event_type", nullable = false, length = 64)
     private String eventType;
 
-    @Column(name = "payload", nullable = false, columnDefinition = "jsonb")
+    @Column(name = "payload", nullable = false)
     private String payload;
 
     @Column(name = "processed_at")

@@ -1,6 +1,8 @@
 package com.vietct.OrderFlow.order.bootstrap;
 
+import com.vietct.OrderFlow.catalog.domain.Category;
 import com.vietct.OrderFlow.catalog.domain.Product;
+import com.vietct.OrderFlow.catalog.repository.CategoryRepository;
 import com.vietct.OrderFlow.catalog.repository.ProductRepository;
 import com.vietct.OrderFlow.inventory.domain.Inventory;
 import com.vietct.OrderFlow.inventory.repository.InventoryRepository;
@@ -12,12 +14,12 @@ import com.vietct.OrderFlow.order.service.OrderService;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -25,6 +27,7 @@ import java.util.concurrent.ThreadFactory;
 
 @Component
 @Profile("dev")
+@DependsOn("catalogManualTestRunner")
 public class OrderConcurrencyDemoRunner {
 
     private static final Logger log = LoggerFactory.getLogger(OrderConcurrencyDemoRunner.class);
@@ -32,13 +35,16 @@ public class OrderConcurrencyDemoRunner {
     private static final boolean ENABLED = true;
 
     private final ProductRepository productRepository;
+    private final CategoryRepository categoryRepository;
     private final InventoryRepository inventoryRepository;
     private final OrderService orderService;
 
     public OrderConcurrencyDemoRunner(ProductRepository productRepository,
+                                      CategoryRepository categoryRepository,
                                       InventoryRepository inventoryRepository,
                                       OrderService orderService) {
         this.productRepository = productRepository;
+        this.categoryRepository = categoryRepository;
         this.inventoryRepository = inventoryRepository;
         this.orderService = orderService;
     }
@@ -64,7 +70,6 @@ public class OrderConcurrencyDemoRunner {
         log.info("Demo product id={} price={} stock={}",
                 product.getId(), product.getPrice(), inventory.getAvailableQuantity());
 
-        // 3) Build request (same product, qty=1)
         UUID demoUserId = UUID.randomUUID();
         OrderItemRequest itemRequest = new OrderItemRequest(product.getId(), 1);
         OrderCreateRequest orderRequest = new OrderCreateRequest(
@@ -74,7 +79,6 @@ public class OrderConcurrencyDemoRunner {
         );
 
         var executor = Executors.newFixedThreadPool(2, new NamedThreadFactory("order-demo-"));
-
         CountDownLatch latch = new CountDownLatch(2);
 
         Runnable task = () -> {
@@ -113,11 +117,27 @@ public class OrderConcurrencyDemoRunner {
     }
 
     private Product createDemoProduct() {
+        Category category = categoryRepository.findAll().stream()
+                .findFirst()
+                .orElseGet(this::createDemoCategory);
+
         Product p = new Product();
         p.setName("Demo Product for Concurrency Test");
         p.setDescription("Demo");
         p.setPrice(new BigDecimal("10.00"));
+        p.setStock(10);
+        p.setCategory(category);
+        p.setImagePath(null);
+
         return productRepository.save(p);
+    }
+
+    private Category createDemoCategory() {
+        Category c = new Category();
+        c.setName("Demo Category");
+        c.setSlug("demo-category");
+        c.setDescription("Demo category for concurrency test");
+        return categoryRepository.save(c);
     }
 
     private Inventory createInventory(Product product) {

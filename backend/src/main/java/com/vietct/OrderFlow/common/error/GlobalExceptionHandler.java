@@ -6,6 +6,9 @@ import java.util.Map;
 
 import com.vietct.OrderFlow.catalog.exception.CategoryNotFoundException;
 import com.vietct.OrderFlow.catalog.exception.ProductNotFoundException;
+import com.vietct.OrderFlow.inventory.exception.InsufficientStockException;
+import com.vietct.OrderFlow.inventory.exception.InventoryNotFoundException;
+import com.vietct.OrderFlow.order.exception.OrderNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -26,7 +29,9 @@ public class GlobalExceptionHandler {
     // 404 – Not Found (domain “not found” exceptions)
     @ExceptionHandler({
             ProductNotFoundException.class,
-            CategoryNotFoundException.class
+            CategoryNotFoundException.class,
+            OrderNotFoundException.class,
+            InventoryNotFoundException.class
     })
     public ResponseEntity<ApiErrorResponse> handleNotFound(RuntimeException ex,
                                                            HttpServletRequest request) {
@@ -94,6 +99,25 @@ public class GlobalExceptionHandler {
         );
 
         log.info("400 Constraint violation at {}: {}", request.getRequestURI(), fieldErrors);
+
+        return ResponseEntity.status(status).body(body);
+    }
+
+    // 2) 409 – Business conflict: insufficient stock
+
+    @ExceptionHandler(InsufficientStockException.class)
+    public ResponseEntity<ApiErrorResponse> handleInsufficientStock(InsufficientStockException ex,
+                                                                    HttpServletRequest request) {
+        HttpStatus status = HttpStatus.CONFLICT;
+
+        ApiErrorResponse body = new ApiErrorResponse(
+                Instant.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                null
+        );
 
         return ResponseEntity.status(status).body(body);
     }

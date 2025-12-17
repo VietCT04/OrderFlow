@@ -27,7 +27,7 @@ public class Category extends BaseEntity {
     @OneToMany(mappedBy = "category", fetch = FetchType.LAZY)
     private List<Product> products = new ArrayList<>();
 
-    protected Category() {
+    public Category() {
         // JPA
     }
 
@@ -59,5 +59,21 @@ public class Category extends BaseEntity {
 
     public void changeDescription(String newDescription) {
         this.description = newDescription;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setSlug(String slug) {
+        this.slug = slug;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public void setProducts(List<Product> products) {
+        this.products = products;
     }
 }

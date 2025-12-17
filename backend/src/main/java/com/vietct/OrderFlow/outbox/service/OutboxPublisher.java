@@ -15,7 +15,7 @@ import java.time.Instant;
 import java.util.List;
 
 @Component
-@Profile("dev")
+@Profile("kafka")
 public class OutboxPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(OutboxPublisher.class);

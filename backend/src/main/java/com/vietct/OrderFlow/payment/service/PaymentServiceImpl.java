@@ -3,8 +3,6 @@ package com.vietct.OrderFlow.payment.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vietct.OrderFlow.order.domain.Order;
-import com.vietct.OrderFlow.order.domain.OrderStatus;
-import com.vietct.OrderFlow.order.repository.OrderRepository;
 import com.vietct.OrderFlow.outbox.domain.OutboxEvent;
 import com.vietct.OrderFlow.outbox.repository.OutboxEventRepository;
 import com.vietct.OrderFlow.payment.domain.Payment;
@@ -28,18 +26,18 @@ public class PaymentServiceImpl implements PaymentService {
     private static final String EVENT_TYPE_PAYMENT_COMPLETED = "PAYMENT_COMPLETED";
 
     private final PaymentRepository paymentRepository;
-    private final OrderRepository orderRepository;
     private final OutboxEventRepository outboxEventRepository;
     private final ObjectMapper objectMapper;
+    private final PaymentEventProcessor paymentEventProcessor;
 
     public PaymentServiceImpl(PaymentRepository paymentRepository,
-                              OrderRepository orderRepository,
                               OutboxEventRepository outboxEventRepository,
-                              ObjectMapper objectMapper) {
+                              ObjectMapper objectMapper,
+                              PaymentEventProcessor paymentEventProcessor) {
         this.paymentRepository = paymentRepository;
-        this.orderRepository = orderRepository;
         this.outboxEventRepository = outboxEventRepository;
         this.objectMapper = objectMapper;
+        this.paymentEventProcessor = paymentEventProcessor;
     }
 
     @Override
@@ -53,9 +51,6 @@ public class PaymentServiceImpl implements PaymentService {
 
         Payment savedPayment = paymentRepository.save(payment);
 
-        order.setStatus(OrderStatus.PAID);
-        orderRepository.save(order);
-
         PaymentCompletedEvent event = new PaymentCompletedEvent(
                 savedPayment.getId(),
                 order.getId(),
@@ -63,6 +58,8 @@ public class PaymentServiceImpl implements PaymentService {
                 paymentMethod,
                 Instant.now()
         );
+
+        paymentEventProcessor.handlePaymentCompleted(event);
 
         String payloadJson = toJson(event);
 
@@ -74,7 +71,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         outboxEventRepository.save(outboxEvent);
 
-        log.info("Created outbox event [{}] for paymentId={}", EVENT_TYPE_PAYMENT_COMPLETED, savedPayment.getId());
+        log.info("Payment {} processed, outbox event created", savedPayment.getId());
 
         return savedPayment;
     }

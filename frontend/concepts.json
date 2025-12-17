@@ -1,15 +1,15 @@
 {
   "project": "OrderFlow Backend",
   "highlights": [
-    "Built a clean Spring Boot backend with layered architecture separating controller, service, repository, and domain logic",
-    "Used Flyway migrations with Hibernate schema validation to prevent database drift across environments",
-    "Designed a shared BaseEntity with UUID primary keys and automatic createdAt and updatedAt auditing",
-    "Modeled Category and Product domain with proper JPA relationships, constraints, and indexes for integrity and performance",
-    "Implemented Spring Data JPA repositories with pagination, sorting, and custom query methods",
-    "Encapsulated business logic in a transactional service layer with clear domain exceptions",
-    "Standardized API responses using DTOs and a global exception handler for consistent error handling",
-    "Configured global CORS to enable safe frontend integration during development",
-    "Added environment-specific configuration for dev and test profiles",
-    "Integrated Testcontainers with PostgreSQL to run realistic, CI-safe integration tests"
+    "Spring Boot 3.5 + Java 17 backend that now covers catalog, order, inventory, payment, and outbox modules behind clean controller/service/repository layers",
+    "All aggregates extend BaseEntity to inherit UUID identifiers plus auditing timestamps, so Category/Product/Order/Payment records stay consistent out of the box",
+    "OrderServiceImpl runs inside a READ_COMMITTED transaction, loads each Product, enforces inventory availability, calculates totals, and flips Orders to PAID as soon as payment succeeds",
+    "Inventory is modeled as a one-to-one record per Product with @Version-based optimistic locking and descriptive InsufficientStockException / InventoryNotFoundException errors",
+    "PaymentService persists Payment rows, updates the Order status, and emits PaymentCompletedEvent payloads as serialized JSON into the outbox table",
+    "An OutboxPublisher scheduled task (dev profile) streams unprocessed events to Kafka topic payment.events and stamps processedAt to prevent duplicate sends",
+    "Flyway migrations V1–V3 build the catalog tables, add orders + inventory + payments, and introduce the outbox_event table with a partial index for efficient polling",
+    "application-dev wires local Postgres + Kafka while application-test keeps Flyway enabled so Testcontainers integration tests boot the schema exactly like dev",
+    "Global validation annotations plus ApiErrorResponse/GlobalExceptionHandler standardize error payloads for Catalog and Order APIs",
+    "Dev-only CatalogManualTestRunner seeds data and OrderConcurrencyDemoRunner races two threads against the same inventory row to showcase stock protection"
   ]
 }

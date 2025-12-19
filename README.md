@@ -17,6 +17,8 @@ OrderFlow models the critical slices of an e-commerce backend: catalog metadata,
 - **Predictable API failures:** `GlobalExceptionHandler` normalizes validation errors, inventory conflicts, and 404s into `ApiErrorResponse`, making it obvious which rule tripped.
 - **Audited data:** `BaseEntity` seeds UUIDs and created/updated timestamps automatically so every aggregate is traceable without extra boilerplate.
 - **Automated schema governance:** Flyway migrations (V1-V4) define all tables, relations, and indexes; Testcontainers-backed integration tests prove they run the same way locally and in CI.
+- **Flexible catalog filtering:** `/products/search` accepts text, category, price, and stock filters, builds a Spring `Specification` via `ProductSearchCriteria` + `ProductSpecifications`, and returns pageable `ProductResponseDTO`s sorted on any column.
+- **Dynamic query composition:** `CatalogServiceImpl.searchProducts` feeds the criteria record into `ProductSpecifications.build`, which lowercases text matches on name/description, adds category joins, enforces price ranges, and toggles an `availableQuantity > 0` predicate only when the caller sets `inStockOnly`. The resulting `Specification<Product>` lets Spring Data produce a single SQL statement per request without a combinatorial explosion of repository methods or fragile string concatenation.
 
 ---
 
@@ -57,7 +59,7 @@ OrderFlow models the critical slices of an e-commerce backend: catalog metadata,
 
 | Module | Responsibilities | Key classes |
 | --- | --- | --- |
-| Catalog | Expose `/products`, pagination, slug-based lookups, DTO projection | `CatalogController`, `CatalogServiceImpl`, `ProductRepository` |
+| Catalog | Expose `/products`, pagination, slug-based lookups, DTO projection, and `/products/search` with compound filters | `CatalogController`, `CatalogServiceImpl`, `ProductRepository`, `ProductSpecifications`, `ProductSearchCriteria` |
 | Inventory | Maintain one-to-one stock rows per product, enforce optimistic locking, surface business errors | `Inventory` entity, `InventoryRepository`, `InsufficientStockException` |
 | Order | Accept checkout payloads, orchestrate totals, manage order status, expose `/orders/:id` | `OrderController`, `OrderServiceImpl`, `Order`, `OrderItem` |
 | Payment | Store payment records, emit `PaymentCompletedEvent`, call the notification service, insert outbox rows | `PaymentServiceImpl`, `Payment`, `PaymentEventProcessorImpl` |
@@ -109,6 +111,12 @@ All schema changes are defined in `db/migration/V1__...sql` through `V4__...sql`
 2. Already-processed IDs short-circuit with a log entry; new IDs persist before mutating the order, so duplicate notifications/order updates are impossible.
 3. Global exception mapping converts any unexpected issue into structured JSON that downstream services can monitor.
 
+### 5. Catalog search & filtering
+1. Clients hit `GET /products/search` with any combination of `q`, `categoryId`, `minPrice`, `maxPrice`, `inStockOnly`, and standard `page / size / sort` query params.
+2. `CatalogController` validates pagination inputs, parses `sort=field,DESC|ASC`, builds a `PageRequest`, and wraps the query arguments inside `ProductSearchCriteria`.
+3. `CatalogService.searchProducts` turns the criteria into a `Specification<Product>` using `ProductSpecifications.build`, adding predicates for case-insensitive text search, category joins, price ranges, and optional in-stock enforcement.
+4. The service returns a `Page<ProductResponseDTO>` so the frontend receives consistent paging metadata regardless of which filters are active.
+
 ---
 
 ## Operational readiness & tooling
@@ -155,6 +163,7 @@ All schema changes are defined in `db/migration/V1__...sql` through `V4__...sql`
 | --- | --- | --- |
 | `GET` | `/health` | Lightweight health probe for orchestrators and smoke tests. |
 | `GET` | `/products?page=&size=&sort=&categoryId=` | Paginated catalog with validated pagination parameters and category filter. |
+| `GET` | `/products/search?q=&categoryId=&minPrice=&maxPrice=&inStockOnly=&sort=` | Full-text and faceted search that combines filters with pagination + sorting. |
 | `GET` | `/products/{id}` | Fetch a single product; returns 404 with structured payload if missing. |
 | `POST` | `/orders` | Places an order, enforces inventory availability, triggers payment capture, and returns the full order aggregate. |
 | `GET` | `/orders/{id}` | Retrieves an order with immutable line items, totals, and status transitions. |

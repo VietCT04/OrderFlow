@@ -184,6 +184,15 @@
                 "Page<Product> findByCategoryId(UUID categoryId, Pageable pageable)"
               ]
             }
+          ],
+          "helpers": [
+            {
+              "name": "ProductSpecifications",
+              "role": "Static builder for catalog search Specifications",
+              "responsibilities": [
+                "Examines ProductSearchCriteria and conditionally adds predicates for text, category, price bounds, and in-stock-only checks"
+              ]
+            }
           ]
         },
         {
@@ -254,6 +263,20 @@
                 "String imagePath",
                 "UUID categoryId"
               ]
+            },
+            {
+              "name": "ProductSearchCriteria",
+              "role": "Record describing optional catalog filters for search operations",
+              "fields": [
+                "String text",
+                "UUID categoryId",
+                "BigDecimal minPrice",
+                "BigDecimal maxPrice",
+                "Boolean inStockOnly"
+              ],
+              "notes": [
+                "Null entries skip their predicates when ProductSpecifications builds the Specification"
+              ]
             }
           ]
         },
@@ -266,7 +289,8 @@
               "role": "Read-only catalog use cases",
               "methods": [
                 "Product getProductById(UUID id)",
-                "Page<Product> getProducts(UUID categoryId, Pageable pageable)"
+                "Page<Product> getProducts(UUID categoryId, Pageable pageable)",
+                "Page<Product> searchProducts(ProductSearchCriteria criteria, Pageable pageable)"
               ]
             },
             {
@@ -280,7 +304,8 @@
               ],
               "responsibilities": [
                 "Loads products by id or throws ProductNotFoundException",
-                "Supports pageable listings and validates categoryId before filtering"
+                "Supports pageable listings and validates categoryId before filtering",
+                "Builds JPA Specifications via ProductSpecifications for the /products/search endpoint"
               ]
             }
           ]
@@ -299,6 +324,7 @@
               ],
               "endpoints": [
                 "GET /products?page=&size=&sort=&categoryId= -> Page<ProductResponseDTO>",
+                "GET /products/search?q=&categoryId=&minPrice=&maxPrice=&inStockOnly=&page=&size=&sort= -> pageable ProductResponseDTO search results built from ProductSearchCriteria",
                 "GET /products/{id} -> ProductResponseDTO"
               ]
             }

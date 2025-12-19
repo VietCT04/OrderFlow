@@ -13,7 +13,7 @@ import java.util.UUID;
 public class Order extends BaseEntity {
 
     @Column(name = "user_id", nullable = true)
-    private UUID userId; // placeholder, later link to User entity
+    private UUID userId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 32)
@@ -25,7 +25,8 @@ public class Order extends BaseEntity {
     @OneToMany(
             mappedBy = "order",
             cascade = CascadeType.ALL,
-            orphanRemoval = true
+            orphanRemoval = true,
+            fetch = FetchType.LAZY
     )
     private List<OrderItem> items = new ArrayList<>();
 

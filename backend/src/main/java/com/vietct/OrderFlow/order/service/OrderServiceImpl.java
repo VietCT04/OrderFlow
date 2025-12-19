@@ -15,6 +15,8 @@ import com.vietct.OrderFlow.order.dto.OrderItemRequest;
 import com.vietct.OrderFlow.order.exception.OrderNotFoundException;
 import com.vietct.OrderFlow.order.repository.OrderRepository;
 import com.vietct.OrderFlow.payment.service.PaymentService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -95,5 +97,11 @@ public class OrderServiceImpl implements OrderService {
     public Order getOrder(UUID id) {
         return orderRepository.findById(id)
                 .orElseThrow(() -> new OrderNotFoundException(id));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Order> getOrdersForUser(UUID userId, Pageable pageable) {
+        return orderRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
     }
 }

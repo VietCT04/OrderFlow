@@ -5,6 +5,8 @@ import com.vietct.OrderFlow.order.dto.OrderCreateRequest;
 import com.vietct.OrderFlow.order.dto.OrderResponseDTO;
 import com.vietct.OrderFlow.order.service.OrderService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,5 +33,14 @@ public class OrderController {
     public OrderResponseDTO getOrder(@PathVariable UUID id) {
         Order order = orderService.getOrder(id);
         return OrderResponseDTO.fromDomain(order);
+    }
+
+    @GetMapping
+    public Page<OrderResponseDTO> getOrdersForUser(
+            @RequestParam UUID userId,
+            Pageable pageable
+    ) {
+        Page<Order> page = orderService.getOrdersForUser(userId, pageable);
+        return page.map(OrderResponseDTO::fromDomain);
     }
 }

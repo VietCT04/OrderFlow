@@ -17,13 +17,18 @@ import com.vietct.OrderFlow.order.repository.OrderRepository;
 import com.vietct.OrderFlow.payment.service.PaymentService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
-
+import jakarta.persistence.OptimisticLockException;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -46,24 +51,45 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public Order placeOrder(OrderCreateRequest request) {
+        try {
+            return doPlaceOrderInternal(request);
+        } catch (ObjectOptimisticLockingFailureException | OptimisticLockException ex) {
+            throw new InsufficientStockException("Failed to place order due to concurrent stock updates");
+        }
+    }
+
+    private Order doPlaceOrderInternal(OrderCreateRequest request) {
+        List<UUID> productIds = request.items().stream()
+                .map(OrderItemRequest::productId)
+                .toList();
+
+        var productsById = productRepository.findAllById(productIds).stream()
+                .collect(Collectors.toMap(p -> p.getId(), Function.identity()));
+
         Order order = new Order();
         order.setUserId(request.userId());
         order.setStatus(OrderStatus.PENDING);
 
         BigDecimal total = BigDecimal.ZERO;
+        List<OrderItem> items = new ArrayList<>();
 
         for (OrderItemRequest itemRequest : request.items()) {
             UUID productId = itemRequest.productId();
 
-            Product product = productRepository.findById(productId)
-                    .orElseThrow(() -> new ProductNotFoundException(productId));
+            Product product = productsById.get(productId);
+            if (product == null) {
+                throw new ProductNotFoundException(productId);
+            }
 
             Inventory inventory = inventoryRepository.findByProductId(productId)
                     .orElseThrow(() -> new InventoryNotFoundException(productId));
 
             int requestedQty = itemRequest.quantity();
-            int available = inventory.getAvailableQuantity();
+            if (requestedQty <= 0) {
+                throw new IllegalArgumentException("Quantity must be positive for product: " + productId);
+            }
 
+            int available = inventory.getAvailableQuantity();
             if (available < requestedQty) {
                 throw new InsufficientStockException(productId);
             }
@@ -71,11 +97,12 @@ public class OrderServiceImpl implements OrderService {
             inventory.setAvailableQuantity(available - requestedQty);
 
             OrderItem orderItem = new OrderItem();
+            orderItem.setOrder(order);
             orderItem.setProduct(product);
             orderItem.setQuantity(requestedQty);
             orderItem.setPriceAtOrder(product.getPrice());
 
-            order.addItem(orderItem);
+            items.add(orderItem);
 
             BigDecimal lineTotal = product.getPrice()
                     .multiply(BigDecimal.valueOf(requestedQty));
@@ -83,11 +110,10 @@ public class OrderServiceImpl implements OrderService {
         }
 
         order.setTotalAmount(total);
+        order.setItems(items);
 
-        // Persist order first (so it has an ID for payment)
         Order savedOrder = orderRepository.save(order);
 
-        // In Sprint 2 we treat payment as always-successful, synchronous
         paymentService.processPayment(savedOrder, total, request.paymentMethod());
 
         return savedOrder;

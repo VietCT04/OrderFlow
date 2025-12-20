@@ -58,6 +58,10 @@ public class Order extends BaseEntity {
         return items;
     }
 
+    public void setItems(List<OrderItem> items) {
+        this.items = items;
+    }
+
     // helper methods to manage bidirectional relationship
     public void addItem(OrderItem item) {
         items.add(item);

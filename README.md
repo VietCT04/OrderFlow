@@ -10,15 +10,14 @@ OrderFlow models the critical slices of an e-commerce backend: catalog metadata,
 
 ## Problems solved & concepts applied
 
-- **No phantom/dirty reads:** `OrderServiceImpl.placeOrder` executes inside a `READ_COMMITTED` transaction so the combined order, inventory, and payment work either succeeds atomically or rolls back cleanly.
-- **Double-spend prevention:** Inventory rows carry a JPA `@Version` column; if two checkouts race the same product, the loser sees `InsufficientStockException` instead of overselling stock.
-- **Transactional outbox:** `PaymentServiceImpl` persists `OutboxEvent` records in the same transaction that stores `Payment`, guaranteeing downstream consumers never miss a successful payment even if Kafka is down temporarily.
+- **Double-spend prevention via optimistic locking:** Inventory rows carry a JPA `@Version` column so if two shoppers smash "Buy" on the last Steam Deck, the first commit wins and the second receives `InsufficientStockException` instead of an accidental oversell.
+- **Kafka-backed transactional outbox:** The same transaction that writes `Payment` rows stores serialized `OutboxEvent` payloads so the scheduled publisher can drain them into the `payment.events` Kafka topic, guaranteeing downstream services never miss a successful capture even if the broker briefly goes dark.
 - **Idempotent projections:** `PaymentEventProcessorImpl` records every processed `payment_id` in `processed_payment_event` before touching the `Order`, so retries or duplicated Kafka messages cannot mark an order paid twice.
+- **No phantom/dirty reads:** `OrderServiceImpl.placeOrder` executes inside a `READ_COMMITTED` transaction so the combined order, inventory, and payment work either succeeds atomically or rolls back cleanly.
 - **Predictable API failures:** `GlobalExceptionHandler` normalizes validation errors, inventory conflicts, and 404s into `ApiErrorResponse`, making it obvious which rule tripped.
 - **Audited data:** `BaseEntity` seeds UUIDs and created/updated timestamps automatically so every aggregate is traceable without extra boilerplate.
 - **Automated schema governance:** Flyway migrations (V1-V4) define all tables, relations, and indexes; Testcontainers-backed integration tests prove they run the same way locally and in CI.
-- **Flexible catalog filtering:** `/products/search` accepts text, category, price, and stock filters, builds a Spring `Specification` via `ProductSearchCriteria` + `ProductSpecifications`, and returns pageable `ProductResponseDTO`s sorted on any column.
-- **Dynamic query composition:** `CatalogServiceImpl.searchProducts` feeds the criteria record into `ProductSpecifications.build`, which lowercases text matches on name/description, adds category joins, enforces price ranges, and toggles an `availableQuantity > 0` predicate only when the caller sets `inStockOnly`. The resulting `Specification<Product>` lets Spring Data produce a single SQL statement per request without a combinatorial explosion of repository methods or fragile string concatenation.
+- **Flexible catalog filtering with dynamic specifications:** `/products/search` accepts text, category, price, and stock filters, and `ProductSpecifications.build` turns the `ProductSearchCriteria` into a single Spring Data `Specification` that lowercases text queries, joins categories, enforces price bands, and toggles `availableQuantity > 0` when requested so every combination executes as one SQL call without a combinatorial repository explosion.
 
 ---
 

@@ -21,6 +21,7 @@ OrderFlow models the critical slices of an e-commerce backend: catalog metadata,
 - **Hot-read caching with Redis:** `CatalogServiceImpl` keeps `getProductById` and the default landing page query behind Redis caches (60s and 30s TTL) configured in `RedisConfig`, pulling the busiest reads away from PostgreSQL while still exposing dedicated `@CacheEvict` hooks.
 - **Cluster-safe background jobs with distributed locks:** `RedisDistributedLockManager` issues five-second leases (e.g., `outbox:publisher`) so `OutboxPublisher` or future schedulers only run once per cluster even when multiple JVMs share the profile.
 - **Rate limiting at the edge:** `RateLimitingFilter` counts `POST /orders` calls in Redis per `X-User-Id` (or IP fallback) and returns a structured 429 after 20 hits in a 60-second window, protecting the payment path from abuse without involving PostgreSQL.
+- **N+1 query hygiene:** High-volume readers such as `/orders?userId=` already leverage `@EntityGraph(attributePaths = {"items", "items.product"})`, and the README now tracks remaining hotspots (catalog search, single-order fetch, and checkout inventory loop) so entity graphs or batched loaders are added before traffic scales.
 
 ---
 
@@ -144,6 +145,16 @@ All schema changes are defined in `db/migration/V1__...sql` through `V4__...sql`
 - **Service unit tests:** Mockito-based tests (e.g., `CatalogServiceImplTest`) verify paging logic, repository usage, and exception behavior without needing Spring context.
 - **Manual runners:** `CatalogManualTestRunner` and the concurrency demo provide deterministic logs when verifying new changes locally.
 - **CI hooks:** `.github/workflows/checklist-logger.yml` keeps issue tracking tidy so work items stay visible to stakeholders.
+
+## N+1 query scan
+
+| Path / endpoint | Observation | Mitigation |
+| --- | --- | --- |
+| `GET /products/search` (`CatalogController` → `backend/src/main/java/com/vietct/OrderFlow/catalog/dto/ProductResponseDTO.java:55`) | `ProductResponseDTO.fromDomain` dereferences `product.getCategory()` while `Product.category` is marked `fetch = LAZY`, so every page triggers one query for products plus one per category row returned. | Add `@EntityGraph(attributePaths = "category")` (or dedicated projection queries) to the catalog readers so each page is satisfied in a single SQL round trip. |
+| `GET /orders/{id}` (`backend/src/main/java/com/vietct/OrderFlow/order/dto/OrderResponseDTO.java:28` + `OrderItemResponseDTO.java:16-17`) | `orderRepository.findById` does not fetch `items.product`, and the DTO pipeline touches `item.getProduct()` per row, producing a select per order item even though the paginated endpoint already uses an entity graph. | Mirror the pagination query by adding `@EntityGraph(attributePaths = {"items","items.product"})` (or a custom fetch join) to the single-order lookup so DTO mapping no longer fan-outs. |
+| `OrderServiceImpl.placeOrder` (`backend/src/main/java/com/vietct/OrderFlow/order/service/OrderServiceImpl.java:84`) | Inventory rows are loaded in a loop via `inventoryRepository.findByProductId`, so a cart with *n* unique SKUs issues *n* additional `SELECT ... FOR UPDATE` statements during checkout. | Introduce `InventoryRepository.findByProductIdIn(...)` (or a join query) to hydrate a map of inventories up front, mirroring how products are prefetched before iterating. |
+
+`OrderRepository.findByUserIdOrderByCreatedAtDesc` (`backend/src/main/java/com/vietct/OrderFlow/order/repository/OrderRepository.java:12`) already applies `@EntityGraph(attributePaths = {"items", "items.product"})`, so the `/orders?userId=` listing endpoint is immune to this class of regressions today.
 
 ---
 

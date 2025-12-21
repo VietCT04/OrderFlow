@@ -4,7 +4,7 @@
 
 ## Overview
 
-OrderFlow models the critical slices of an e-commerce backend: catalog metadata, inventory protection, ACID-compliant order placement, synchronous payment capture, transactional outbox emission, and idempotent downstream processing. Every module is structured behind controller -> service -> repository layers, all aggregates extend a shared `BaseEntity` for UUID IDs plus auditing timestamps, and dev profiles boot seed data plus a concurrency lab to prove the locking strategy. PostgreSQL stores the truth, Flyway versions the schema, and the `kafka` Spring profile enables an outbox publisher that streams payment events to `payment.events`.
+OrderFlow models the critical slices of an e-commerce backend: catalog metadata, inventory protection, ACID-compliant order placement, synchronous payment capture, transactional outbox emission, and idempotent downstream processing. Every module is structured behind controller -> service -> repository layers, all aggregates extend a shared `BaseEntity` for UUID IDs plus auditing timestamps, and dev profiles boot seed data plus a concurrency lab to prove the locking strategy. PostgreSQL stores the truth, Flyway versions the schema, the `kafka` Spring profile enables an outbox publisher that streams payment events to `payment.events`, and Redis sits beside them to cache hot reads, supply distributed locks, and centralize rate limiting.
 
 ---
 
@@ -18,6 +18,9 @@ OrderFlow models the critical slices of an e-commerce backend: catalog metadata,
 - **Audited data:** `BaseEntity` seeds UUIDs and created/updated timestamps automatically so every aggregate is traceable without extra boilerplate.
 - **Automated schema governance:** Flyway migrations (V1-V4) define all tables, relations, and indexes; Testcontainers-backed integration tests prove they run the same way locally and in CI.
 - **Flexible catalog filtering with dynamic specifications:** `/products/search` accepts text, category, price, and stock filters, and `ProductSpecifications.build` turns the `ProductSearchCriteria` into a single Spring Data `Specification` that lowercases text queries, joins categories, enforces price bands, and toggles `availableQuantity > 0` when requested so every combination executes as one SQL call without a combinatorial repository explosion.
+- **Hot-read caching with Redis:** `CatalogServiceImpl` keeps `getProductById` and the default landing page query behind Redis caches (60s and 30s TTL) configured in `RedisConfig`, pulling the busiest reads away from PostgreSQL while still exposing dedicated `@CacheEvict` hooks.
+- **Cluster-safe background jobs with distributed locks:** `RedisDistributedLockManager` issues five-second leases (e.g., `outbox:publisher`) so `OutboxPublisher` or future schedulers only run once per cluster even when multiple JVMs share the profile.
+- **Rate limiting at the edge:** `RateLimitingFilter` counts `POST /orders` calls in Redis per `X-User-Id` (or IP fallback) and returns a structured 429 after 20 hits in a 60-second window, protecting the payment path from abuse without involving PostgreSQL.
 
 ---
 
@@ -52,6 +55,8 @@ OrderFlow models the critical slices of an e-commerce backend: catalog metadata,
 
 `Kafka` is only required when the `kafka` profile is active; otherwise, outbox events accumulate in PostgreSQL for inspection.
 
+Redis backs the cross-cutting concerns too: catalog caches (`RedisCacheManager`), distributed job locks (`RedisDistributedLockManager`), and HTTP rate limiting (`RateLimitingFilter`) all share the same Redis cluster so the system can scale horizontally without duplicating coordination logic.
+
 ---
 
 ## Domain modules & responsibilities
@@ -64,7 +69,7 @@ OrderFlow models the critical slices of an e-commerce backend: catalog metadata,
 | Payment | Store payment records, emit `PaymentCompletedEvent`, call the notification service, insert outbox rows | `PaymentServiceImpl`, `Payment`, `PaymentEventProcessorImpl` |
 | Outbox | Persist serialized events, poll unprocessed rows, publish to Kafka when available | `OutboxEvent`, `OutboxEventRepository`, `OutboxPublisher` |
 | Notification | Current implementation logs events but abstracts the dependency for email/SMS/webhooks later | `NotificationService`, `LoggingNotificationService` |
-| Common / Platform | Auditing, transactions, scheduling, error envelopes, health checks, Flyway configuration | `BaseEntity`, `JpaConfig`, `GlobalExceptionHandler`, `SchedulingConfig`, `HealthController` |
+| Common / Platform | Auditing, transactions, scheduling, error envelopes, health checks, Flyway configuration, Redis glue (caching, locks, rate limiting) | `BaseEntity`, `JpaConfig`, `GlobalExceptionHandler`, `SchedulingConfig`, `HealthController`, `RedisConfig`, `RedisDistributedLockManager`, `RateLimitingFilter` |
 
 ---
 
@@ -116,12 +121,18 @@ All schema changes are defined in `db/migration/V1__...sql` through `V4__...sql`
 3. `CatalogService.searchProducts` turns the criteria into a `Specification<Product>` using `ProductSpecifications.build`, adding predicates for case-insensitive text search, category joins, price ranges, and optional in-stock enforcement.
 4. The service returns a `Page<ProductResponseDTO>` so the frontend receives consistent paging metadata regardless of which filters are active.
 
+### 6. Redis caching, locks & rate limiting
+1. `RateLimitingFilter` runs at `Ordered.HIGHEST_PRECEDENCE + 10`, increments `rl:orders:{identity}:{window}` keys built from `X-User-Id` headers (or client IPs), and short-circuits with a JSON 429 once someone issues more than 20 `POST /orders` calls inside the 60-second rolling window.
+2. `RedisConfig` provisions a JSON-serializing `RedisCacheManager` with 60-second defaults plus tuned caches (`productById` for 60s, `frontPageProducts` for 30s). `CatalogServiceImpl` leans on `@Cacheable` and exposes `@CacheEvict` helpers so product writes can proactively invalidate the hot entries.
+3. `RedisDistributedLockManager` mints UUID tokens for jobs such as `outbox:publisher`, keeping the lease alive for five seconds so only one `OutboxPublisher` instance drains up to 100 pending events even if multiple app nodes are running.
+
 ---
 
 ## Operational readiness & tooling
 
 - **Profiles:** `dev` enables data seeders and the concurrency runner; `test` is optimized for Testcontainers; `kafka` turns on the outbox publisher.
-- **Configuration:** `application-*.properties` describe Postgres, Kafka, and Flyway wiring; `CorsConfig` exposes the APIs to any local clients.
+- **Configuration:** `application-*.properties` describe Postgres, Kafka, Redis, and Flyway wiring; `CorsConfig` exposes the APIs to any local clients, and `RedisConfig` centralizes connection and serialization defaults.
+- **Traffic shaping & coordination:** `RateLimitingFilter` (highest precedence) and `RedisDistributedLockManager` share Redis to enforce API quotas and single-owner schedulers even when multiple JVMs are running.
 - **Scheduling & health:** `SchedulingConfig` activates background tasks, while `/health` provides a simple readiness check for container orchestrators.
 - **Logging & observability:** Structured log messages exist around critical paths (order placement, outbox publishing, payment processing) for fast incident investigation.
 
@@ -138,7 +149,7 @@ All schema changes are defined in `db/migration/V1__...sql` through `V4__...sql`
 
 ## Run locally (backend only)
 
-1. **Prerequisites:** Java 17, Maven Wrapper, PostgreSQL reachable at the coordinates in `application-dev.properties` (or update the file), optional Kafka broker if you want to exercise the outbox publisher.
+1. **Prerequisites:** Java 17, Maven Wrapper, PostgreSQL reachable at the coordinates in `application-dev.properties` (or update the file), Redis 6+ reachable at `spring.data.redis.*` (defaults to `localhost:6379`), and an optional Kafka broker if you want to exercise the outbox publisher.
 2. **Start the API:**
    ```bash
    cd backend
@@ -164,7 +175,7 @@ All schema changes are defined in `db/migration/V1__...sql` through `V4__...sql`
 | `GET` | `/products?page=&size=&sort=&categoryId=` | Paginated catalog with validated pagination parameters and category filter. |
 | `GET` | `/products/search?q=&categoryId=&minPrice=&maxPrice=&inStockOnly=&sort=` | Full-text and faceted search that combines filters with pagination + sorting. |
 | `GET` | `/products/{id}` | Fetch a single product; returns 404 with structured payload if missing. |
-| `POST` | `/orders` | Places an order, enforces inventory availability, triggers payment capture, and returns the full order aggregate. |
+| `POST` | `/orders` | Places an order, enforces inventory availability, triggers payment capture, returns the full order aggregate, and is rate limited (20/min per user or IP) via Redis. |
 | `GET` | `/orders/{id}` | Retrieves an order with immutable line items, totals, and status transitions. |
 
 ---
